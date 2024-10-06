@@ -37,7 +37,7 @@ func (p *Provider) Start(ctx context.Context) func(ctx context.Context) error {
 		panic(err)
 	}
 
-	if p.props.Trace.Enabled {
+	if p.props.Metric.Enabled {
 		otel.SetMeterProvider(sdkmetric.NewMeterProvider(
 			sdkmetric.WithReader(exporter),
 			sdkmetric.WithResource(r)),
