@@ -1,0 +1,44 @@
+services:
+  zipkin:
+    image: openzipkin/zipkin
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - metrics
+    command:
+      - --config.file=/etc/prometheus/prometheus.yaml
+    volumes:
+      - .docker/prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+  
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - metrics
+    depends_on:
+      - prometheus
+  
+  jaeger:
+    image: jaegertracing/all-in-one:1.60.0
+    container_name: jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"
+      - "4318:4318"
+      - "4317:4317"
+    networks:
+      - metrics
+
+networks:
+  metrics:
+    driver: bridge
