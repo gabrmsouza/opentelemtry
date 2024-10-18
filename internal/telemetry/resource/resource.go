@@ -1,14 +1,14 @@
 package resource
 
 import (
-	"github.com/gabrmsouza/fullcycle/opentelemetry/internal/telemetry/properties"
+	"github.com/gabrmsouza/fullcycle/opentelemetry/pkg/telemetry/properties"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
 func New(props properties.Service) (*resource.Resource, error) {
 	return resource.Merge(
-		resource.Default(),
+		resource.Environment(),
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceName(props.Name),

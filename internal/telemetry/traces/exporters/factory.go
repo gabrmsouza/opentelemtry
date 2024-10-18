@@ -3,28 +3,29 @@ package exporters
 import (
 	"context"
 
-	"github.com/gabrmsouza/fullcycle/opentelemetry/internal/telemetry/properties"
 	"github.com/gabrmsouza/fullcycle/opentelemetry/internal/telemetry/traces/exporters/grpc"
 	"github.com/gabrmsouza/fullcycle/opentelemetry/internal/telemetry/traces/exporters/http"
 	"github.com/gabrmsouza/fullcycle/opentelemetry/internal/telemetry/traces/exporters/stdout"
 	"github.com/gabrmsouza/fullcycle/opentelemetry/internal/telemetry/traces/exporters/zipkin"
+	"github.com/gabrmsouza/fullcycle/opentelemetry/pkg/telemetry/properties"
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 type Exporter interface {
-	GetExporter(ctx context.Context) (sdktrace.SpanExporter, error)
+	Start(ctx context.Context) (sdktrace.SpanExporter, error)
+	Shutdown(ctx context.Context) error
 }
 
-func New(props properties.Exporter) Exporter {
+func New(props properties.TraceExporter) Exporter {
 	switch props.Type {
-	case "http":
+	case properties.HttpExporter:
 		return http.New(props)
-	case "grpc":
+	case properties.GrpcExporter:
 		return grpc.New(props)
-	case "stdout":
+	case properties.StdoutExporter:
 		return stdout.New()
-	case "zipkin":
+	case properties.ZipkinExporter:
 		return zipkin.New(props)
 	default:
 		return stdout.New()

@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/gabrmsouza/fullcycle/opentelemetry/internal/telemetry/metrics/exporters"
-	"github.com/gabrmsouza/fullcycle/opentelemetry/internal/telemetry/properties"
-	"github.com/gabrmsouza/fullcycle/opentelemetry/internal/telemetry/traces/resource"
+	"github.com/gabrmsouza/fullcycle/opentelemetry/internal/telemetry/resource"
+	"github.com/gabrmsouza/fullcycle/opentelemetry/pkg/telemetry/properties"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
@@ -14,38 +14,41 @@ import (
 )
 
 type Provider struct {
-	props properties.Telemetry
+	props  properties.Telemetry
+	reader exporters.Reader
 }
 
-func New(props properties.Telemetry) *Provider {
-	return &Provider{props}
-}
-
-func (p *Provider) Start(ctx context.Context) func(ctx context.Context) error {
-	if !p.props.Enabled {
-		return func(ctx context.Context) error {
-			return nil
-		}
+func New(props properties.Telemetry, reader exporters.Reader) *Provider {
+	return &Provider{
+		props:  props,
+		reader: reader,
 	}
-	exporter, err := exporters.New(ctx, p.props.Metric.Exporter.Type)
+}
+
+func (p *Provider) Start(ctx context.Context) error {
+	reader, err := p.reader.Start(ctx)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	r, err := resource.New(p.props.Service)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	if p.props.Metric.Enabled {
+	if !p.props.Metric.Enabled {
+		otel.SetMeterProvider(noop.NewMeterProvider())
+	} else {
 		otel.SetMeterProvider(sdkmetric.NewMeterProvider(
-			sdkmetric.WithReader(exporter),
+			sdkmetric.WithReader(reader),
 			sdkmetric.WithResource(r)),
 		)
-	} else {
-		otel.SetMeterProvider(noop.NewMeterProvider())
 	}
-	return exporter.Shutdown
+	return nil
+}
+
+func (p *Provider) Shutdown(ctx context.Context) error {
+	return p.reader.Shutdown(ctx)
 }
 
 func (p *Provider) GetMeter() metric.Meter {

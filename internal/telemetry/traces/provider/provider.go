@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/gabrmsouza/fullcycle/opentelemetry/internal/telemetry/properties"
+	"github.com/gabrmsouza/fullcycle/opentelemetry/internal/telemetry/resource"
 	"github.com/gabrmsouza/fullcycle/opentelemetry/internal/telemetry/traces/exporters"
-	"github.com/gabrmsouza/fullcycle/opentelemetry/internal/telemetry/traces/resource"
+	"github.com/gabrmsouza/fullcycle/opentelemetry/pkg/telemetry/properties"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -15,46 +15,49 @@ import (
 )
 
 type Provider struct {
-	props properties.Telemetry
+	props    properties.Telemetry
+	exporter exporters.Exporter
 }
 
-func New(props properties.Telemetry) *Provider {
-	return &Provider{props}
-}
-
-func (p *Provider) Start(ctx context.Context) func(ctx context.Context) error {
-	if !p.props.Enabled {
-		return func(ctx context.Context) error {
-			return nil
-		}
+func New(props properties.Telemetry, exporter exporters.Exporter) *Provider {
+	return &Provider{
+		props:    props,
+		exporter: exporter,
 	}
-	exporter, err := exporters.New(p.props.Trace.Exporter).GetExporter(ctx)
+}
+
+func (p *Provider) Start(ctx context.Context) error {
+	e, err := p.exporter.Start(ctx)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	r, err := resource.New(p.props.Service)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	if p.props.Trace.Enabled {
+	if !p.props.Trace.Enabled {
+		otel.SetTracerProvider(noop.NewTracerProvider())
+	} else {
 		otel.SetTracerProvider(sdktrace.NewTracerProvider(
 			sdktrace.WithSampler(sdktrace.AlwaysSample()),
-			sdktrace.WithSpanProcessor(sdktrace.NewBatchSpanProcessor(exporter)),
+			sdktrace.WithSpanProcessor(sdktrace.NewBatchSpanProcessor(e)),
 			sdktrace.WithResource(r),
 		))
-	} else {
-		otel.SetTracerProvider(noop.NewTracerProvider())
 	}
 
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
 	))
-	return exporter.Shutdown
+	return nil
 }
 
 func (p *Provider) GetTracer() trace.Tracer {
 	return otel.Tracer(fmt.Sprintf("io.opentelemetry.traces.%s", p.props.Service.Name))
+}
+
+func (p *Provider) Shutdown(ctx context.Context) error {
+	return p.exporter.Shutdown(ctx)
 }

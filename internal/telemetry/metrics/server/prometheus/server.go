@@ -3,6 +3,7 @@ package prometheus
 import (
 	"net/http"
 
+	"github.com/gabrmsouza/fullcycle/opentelemetry/pkg/telemetry/properties"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -12,19 +13,19 @@ type MetricServer struct {
 	port     string
 }
 
-func New(endpoint, port string) *MetricServer {
+func New(props properties.MetricExporter) *MetricServer {
 	return &MetricServer{
-		endpoint: endpoint,
-		port:     port,
+		endpoint: props.Endpoint,
+		port:     props.Port,
 	}
 }
 
-func (s *MetricServer) Serve(errCh chan error) {
+func (s *MetricServer) Serve() error {
 	prometheus := promhttp.Handler()
 	router := mux.NewRouter()
 	router.HandleFunc(s.endpoint, func(w http.ResponseWriter, r *http.Request) {
 		prometheus.ServeHTTP(w, r)
 	})
-
-	errCh <- http.ListenAndServe(":"+s.port, router)
+	err := http.ListenAndServe(":"+s.port, router)
+	return err
 }

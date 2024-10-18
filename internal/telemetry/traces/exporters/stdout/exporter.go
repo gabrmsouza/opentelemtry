@@ -7,14 +7,23 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
-type stdoutExporter struct {
+type Exporter struct {
+	shutdown func(ctx context.Context) error
 }
 
-func New() *stdoutExporter {
-	return &stdoutExporter{}
+func New() *Exporter {
+	return &Exporter{}
 }
 
-func (s stdoutExporter) GetExporter(_ context.Context) (sdktrace.SpanExporter, error) {
+func (s *Exporter) Start(_ context.Context) (sdktrace.SpanExporter, error) {
 	exporter, err := stdouttrace.New()
-	return exporter, err
+	if err != nil {
+		return nil, err
+	}
+	s.shutdown = exporter.Shutdown
+	return exporter, nil
+}
+
+func (s Exporter) Shutdown(ctx context.Context) error {
+	return s.shutdown(ctx)
 }
